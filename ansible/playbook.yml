@@ -1,0 +1,28 @@
+- hosts: localhost
+  connection: local
+  become: false
+
+  tasks:
+    - name: Check Docker installed
+      command: docker --version
+      register: docker_output
+      ignore_errors: yes
+
+    - name: Show Docker version
+      debug:
+        var: docker_output.stdout
+
+    - name: Check kubectl installed
+      command: kubectl version --client
+      register: kubectl_output
+      ignore_errors: yes
+
+    - name: Show kubectl version
+      debug:
+        var: kubectl_output.stdout
+
+    - name: Apply Kubernetes Deployment
+      command: kubectl apply -f ../k8s/deployment.yaml
+
+    - name: Apply Kubernetes Service
+      command: kubectl apply -f ../k8s/service.yaml

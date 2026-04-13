@@ -1,0 +1,257 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Thermal Image Classifier</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: 'Segoe UI', sans-serif;
+      background: #0f0f1a;
+      color: #e0e0f0;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 30px 16px;
+    }
+
+    h1 {
+      font-size: 2rem;
+      margin-bottom: 6px;
+      color: #ff6a00;
+    }
+
+    p.sub {
+      color: #888;
+      font-size: 0.88rem;
+      margin-bottom: 30px;
+    }
+
+    .card {
+      background: #1a1a2e;
+      border: 1px solid #2a2a4a;
+      border-radius: 14px;
+      padding: 30px;
+      width: 100%;
+      max-width: 480px;
+    }
+
+    /* Drop zone */
+    .drop-zone {
+      border: 2px dashed #2a2a4a;
+      border-radius: 10px;
+      padding: 36px 20px;
+      text-align: center;
+      cursor: pointer;
+      position: relative;
+      transition: border-color 0.2s, background 0.2s;
+    }
+    .drop-zone:hover { border-color: #ff6a00; background: rgba(255,106,0,0.05); }
+    .drop-zone input {
+      position: absolute; inset: 0;
+      opacity: 0; cursor: pointer; width: 100%; height: 100%;
+    }
+    .drop-zone .icon { font-size: 2.2rem; display: block; margin-bottom: 10px; }
+    .drop-zone .label { font-size: 0.95rem; }
+    .drop-zone .hint { font-size: 0.78rem; color: #666; margin-top: 5px; }
+
+    /* Preview */
+    #preview-wrap { display: none; margin-top: 18px; border-radius: 8px; overflow: hidden; }
+    #preview-img  { width: 100%; max-height: 240px; object-fit: cover; display: block; }
+
+    /* Button */
+    button {
+      margin-top: 20px;
+      width: 100%;
+      padding: 13px;
+      background: linear-gradient(135deg, #ff6a00, #ff9500);
+      border: none;
+      border-radius: 10px;
+      color: #fff;
+      font-size: 0.95rem;
+      font-weight: 600;
+      cursor: pointer;
+      letter-spacing: 0.05em;
+      transition: opacity 0.2s;
+    }
+    button:disabled { opacity: 0.4; cursor: not-allowed; }
+    button:hover:not(:disabled) { opacity: 0.88; }
+
+    /* Spinner */
+    .spinner {
+      display: inline-block; width: 14px; height: 14px;
+      border: 2px solid rgba(255,255,255,0.3);
+      border-top-color: #fff;
+      border-radius: 50%;
+      animation: spin 0.7s linear infinite;
+      vertical-align: middle; margin-right: 7px;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* Result */
+    #result {
+      display: none;
+      margin-top: 22px;
+      padding: 20px;
+      border-radius: 10px;
+      border: 1px solid #2a2a4a;
+      background: rgba(255,255,255,0.03);
+      animation: fadeUp 0.35s ease;
+    }
+    @keyframes fadeUp {
+      from { opacity: 0; transform: translateY(12px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+
+    .label-row {
+      display: flex; align-items: center; gap: 12px; margin-bottom: 16px;
+    }
+    .label-emoji { font-size: 2.4rem; }
+    .label-name  { font-size: 2rem; font-weight: 700; }
+    .label-name.Cold   { color: #3b9eff; }
+    .label-name.Normal { color: #f5c542; }
+    .label-name.Hot    { color: #ff4444; }
+
+    .metrics { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+    .metric {
+      background: rgba(255,255,255,0.04);
+      border: 1px solid #2a2a4a;
+      border-radius: 8px; padding: 12px;
+    }
+    .metric .m-label { font-size: 0.7rem; color: #888; text-transform: uppercase; letter-spacing: 0.1em; margin-bottom: 4px; }
+    .metric .m-value { font-size: 1.4rem; font-weight: 600; }
+
+    /* Error */
+    #error-msg {
+      display: none; margin-top: 14px;
+      background: rgba(255,60,60,0.1);
+      border: 1px solid rgba(255,60,60,0.3);
+      color: #ff6b6b; border-radius: 8px;
+      padding: 12px 16px; font-size: 0.85rem;
+    }
+  </style>
+</head>
+<body>
+
+  <h1>🌡️ ThermoScan</h1>
+  <p class="sub">Upload a thermal image to classify its temperature</p>
+
+  <div class="card">
+
+    <!-- Upload -->
+    <div class="drop-zone" id="drop-zone">
+      <input type="file" id="file-input" accept="image/*" />
+      <span class="icon">📁</span>
+      <div class="label">Drop image here or click to browse</div>
+      <div class="hint">PNG, JPG, BMP, TIFF</div>
+    </div>
+
+    <!-- Preview -->
+    <div id="preview-wrap">
+      <img id="preview-img" src="" alt="preview" />
+    </div>
+
+    <!-- Analyze -->
+    <button id="analyze-btn" disabled>Analyze Image</button>
+
+    <!-- Error -->
+    <div id="error-msg"></div>
+
+    <!-- Result -->
+    <div id="result">
+      <div class="label-row">
+        <div class="label-emoji" id="res-emoji"></div>
+        <div class="label-name"  id="res-label"></div>
+      </div>
+      <div class="metrics">
+        <div class="metric">
+          <div class="m-label">Temperature</div>
+          <div class="m-value" id="res-temp">—</div>
+        </div>
+        <div class="metric">
+          <div class="m-label">Avg Intensity</div>
+          <div class="m-value" id="res-intensity">—</div>
+        </div>
+      </div>
+    </div>
+
+  </div><!-- /.card -->
+
+  <script>
+    const fileInput  = document.getElementById('file-input');
+    const dropZone   = document.getElementById('drop-zone');
+    const previewW   = document.getElementById('preview-wrap');
+    const previewImg = document.getElementById('preview-img');
+    const analyzeBtn = document.getElementById('analyze-btn');
+    const errorMsg   = document.getElementById('error-msg');
+    const resultDiv  = document.getElementById('result');
+
+    const EMOJI = { Cold: '🔵', Normal: '🟡', Hot: '🔴' };
+    let selectedFile = null;
+
+    // Drag-and-drop highlight
+    dropZone.addEventListener('dragover', e => { e.preventDefault(); dropZone.style.borderColor = '#ff6a00'; });
+    dropZone.addEventListener('dragleave', () => { dropZone.style.borderColor = ''; });
+    dropZone.addEventListener('drop', e => {
+      e.preventDefault(); dropZone.style.borderColor = '';
+      if (e.dataTransfer.files[0]) handleFile(e.dataTransfer.files[0]);
+    });
+
+    fileInput.addEventListener('change', () => {
+      if (fileInput.files[0]) handleFile(fileInput.files[0]);
+    });
+
+    function handleFile(file) {
+      selectedFile = file;
+      const reader = new FileReader();
+      reader.onload = e => { previewImg.src = e.target.result; previewW.style.display = 'block'; };
+      reader.readAsDataURL(file);
+      analyzeBtn.disabled = false;
+      errorMsg.style.display = 'none';
+      resultDiv.style.display = 'none';
+    }
+
+    analyzeBtn.addEventListener('click', async () => {
+      if (!selectedFile) return;
+      analyzeBtn.disabled = true;
+      analyzeBtn.innerHTML = '<span class="spinner"></span>Analyzing...';
+      errorMsg.style.display = 'none';
+      resultDiv.style.display = 'none';
+
+      const fd = new FormData();
+      fd.append('image', selectedFile);
+
+      try {
+        const res  = await fetch('/predict', { method: 'POST', body: fd });
+        const data = await res.json();
+
+        if (!res.ok) { showError(data.error || 'Server error.'); return; }
+
+        document.getElementById('res-emoji').textContent    = EMOJI[data.label] || '❓';
+        const labelEl = document.getElementById('res-label');
+        labelEl.textContent = data.label;
+        labelEl.className   = 'label-name ' + data.label;
+        document.getElementById('res-temp').textContent      = data.temperature.toFixed(2) + ' °C';
+        document.getElementById('res-intensity').textContent = data.avg_intensity.toFixed(1) + ' / 255';
+        resultDiv.style.display = 'block';
+
+      } catch (err) {
+        showError('Network error — make sure Flask is running on port 5001.');
+      } finally {
+        analyzeBtn.disabled = false;
+        analyzeBtn.innerHTML = 'Analyze Image';
+      }
+    });
+
+    function showError(msg) {
+      errorMsg.textContent = '⚠ ' + msg;
+      errorMsg.style.display = 'block';
+    }
+  </script>
+
+</body>
+</html>

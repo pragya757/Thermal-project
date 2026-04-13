@@ -1,0 +1,20 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: thermal-app
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: thermal
+  template:
+    metadata:
+      labels:
+        app: thermal
+    spec:
+      containers:
+      - name: thermal-container
+        image: thermal-app
+        imagePullPolicy: Never
+        ports:
+        - containerPort: 5001
