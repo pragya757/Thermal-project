@@ -1,13 +1,10 @@
 import os
 import uuid
-
 from flask import Flask, request, jsonify, render_template
 from werkzeug.utils import secure_filename
 from model import analyze_thermal_image
 
 app = Flask(__name__)
-
-
 
 UPLOAD_FOLDER = os.path.join(os.path.dirname(__file__), "uploads")
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
@@ -20,13 +17,10 @@ def allowed_file(filename):
 
 @app.route("/")
 def index():
-    REQUEST_COUNT.inc()   # <-- added
     return render_template("index.html")
 
 @app.route("/predict", methods=["POST"])
 def predict():
-    REQUEST_COUNT.inc()   # <-- added
-
     if "image" not in request.files:
         return jsonify({"error": "No image uploaded. Use key 'image'."}), 400
 
@@ -49,7 +43,6 @@ def predict():
 
     return jsonify(result), 200
 
-
 if __name__ == "__main__":
-    port = int(os.environ.get("PORT", 10000))   
+    port = int(os.environ.get("PORT", 10000))
     app.run(host="0.0.0.0", port=port)
