@@ -3,7 +3,9 @@ import uuid
 from flask import Flask, request, jsonify, render_template
 from werkzeug.utils import secure_filename
 from model import analyze_thermal_image
-
+from prometheus_client import Counter, generate_latest, CONTENT_TYPE_LATEST
+from flask import Response
+REQUEST_COUNT = Counter('request_count_total', 'Total number of requests')
 app = Flask(__name__)
 
 UPLOAD_FOLDER = os.path.join(os.path.dirname(__file__), "uploads")
@@ -17,10 +19,12 @@ def allowed_file(filename):
 
 @app.route("/")
 def index():
+    REQUEST_COUNT.inc()
     return render_template("index.html")
 
 @app.route("/predict", methods=["POST"])
 def predict():
+    REQUEST_COUNT.inc()
     if "image" not in request.files:
         return jsonify({"error": "No image uploaded. Use key 'image'."}), 400
 
@@ -42,6 +46,9 @@ def predict():
             os.remove(save_path)
 
     return jsonify(result), 200
+@app.route("/metrics")
+def metrics():
+    return Response(generate_latest(), mimetype=CONTENT_TYPE_LATEST)
 
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 10000))
